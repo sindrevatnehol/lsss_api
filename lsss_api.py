@@ -7,10 +7,35 @@ Created on Fri Nov 29 12:47:43 2019
 
 import requests, os, json,shutil, time, win32api, win32con
 from datetime import date
-import keyboard
 import numpy as np
 
+baseUrl = 'http://localhost:8000'
 
+
+def get(path, params=None):
+    url = baseUrl + path
+    response = requests.get(url, params=params)
+    if response.status_code == 200:
+        return response.json()
+    raise ValueError(url + ' returned status code ' + str(response.status_code) + ': ' + response.text)
+
+
+def post(path, params=None, json=None, data=None):
+    url = baseUrl + path
+    response = requests.post(url, params=params, json=json, data=data)
+    if response.status_code == 200:
+        return response.json()
+    if response.status_code == 204:
+        return None
+    raise ValueError(url + ' returned status code ' + str(response.status_code) + ': ' + response.text)
+
+
+def delete(path, params=None):
+    url = baseUrl + path
+    response = requests.delete(url, params=params)
+    if response.status_code == 200:
+        return None
+    raise ValueError(url + ' returned status code ' + str(response.status_code) + ': ' + response.text)
 
 
 
@@ -58,12 +83,26 @@ def getNMDinfo():
 
 def DownloadDataToScratch(cruise, cruise_name,main_dir):
     
+    #Convert to string
+    cruise = str(cruise)
     
+    
+    #Grab year
     year = cruise[0:4]
     
     
+    import sys
+    
+    if 'win' in sys.platform: 
+        ces_server = '//ces.imr.no/cruise_data/'
+    else: 
+        ces_server = '//data/cruise_data/'
+        
+    
+    
     #list all surveys in year
-    ces = os.listdir('//ces.imr.no/cruise_data/'+year)
+    ces = os.listdir(ces_server+year)
+    
     
     #list the platform to download
     platform = [i for i in ces if cruise in i] 
@@ -79,11 +118,11 @@ def DownloadDataToScratch(cruise, cruise_name,main_dir):
         
     #list all files in folder    
     liste = []
-    for root, subdirs, files in os.walk('//ces.imr.no/cruise_data/'+year+'/'+platform):
+    for root, subdirs, files in os.walk(ces_server+year+'/'+platform):
         if len(files)>0: 
             for file in files: 
                 liste.append(os.path.join(root,file))
-                
+    print('All files in server have been mapped')            
     
     
     if not os.path.exists(main_dir+'/'+cruise_name):
@@ -228,11 +267,13 @@ def automaticInstrument(URLprefix,
                         lsssFile,
                         ek60File,
                         workFile,
-                        vertical_resolution=10,
-                        horizontal_resolution=1,
+                        vertical_resolution=1,
+                        horizontal_resolution=0.1,
                         frequency=38,
                         reportType=25,
-                        TH_min = -55):
+                        TH_min = -55,
+                        sa_min = 0,
+                        acocat = [3,1]):
 
     
     
@@ -241,46 +282,46 @@ def automaticInstrument(URLprefix,
     
     #Read the lsss version. 
     #This will in future help to keep track of ther version
-    r = requests.get(URLprefix + '/lsss/application/info')
-    lsss_version = json.loads(r.content)['version']
+    lsss_version = get('/lsss/application/info')['version']
+    
+    
     
     
     #Prepare the lsss database
     print("Disconnected database")
-    r = requests.post(URLprefix + "/lsss/application/config/unit/DatabaseConf/connected", json={'value':False})
+    post("/lsss/application/config/unit/DatabaseConf/connected",json={'value':False})
     print("Create a new database")
-    r = requests.post(URLprefix + '/lsss/application/config/unit/DatabaseConf/create') #, json={'empty':True})
+    post('/lsss/application/config/unit/DatabaseConf/create',json={'empty':True})
     print("Connect to the new database")
-    r = requests.post(URLprefix + "/lsss/application/config/unit/DatabaseConf/connected", json={'value':True})
+    post("/lsss/application/config/unit/DatabaseConf/connected",json={'value':True})
+
+
 
 
     #Open the lsss survey file
     print("Opening survey")
-    r = requests.post(URLprefix+'/lsss/survey/open', json={'value':lsssFile})
-    print("Opening survey:  " + lsssFile + ": " + str(r.status_code))
-    
+    post('/lsss/survey/open', json={'value':lsssFile})
     
     #Sett the location of the data
     print('Load interpretation data')
-    r = requests.post(URLprefix + '/lsss/survey/config/unit/DataConf/parameter/WorkDir', json={'value':workFile})
+    post('/lsss/survey/config/unit/DataConf/parameter/WorkDir', json={'value':workFile})
     print('Load echosounder data')
-    r = requests.post(URLprefix + '/lsss/survey/config/unit/DataConf/parameter/DataDir', json={'value':ek60File})
-    
+    post('/lsss/survey/config/unit/DataConf/parameter/DataDir', json={'value':ek60File})
     
     #Load all the files
-    r = requests.get(URLprefix + '/lsss/survey/config/unit/DataConf/files')
-    firstIndex = 0
-    lastIndex = len(r.json()) - 1
-    lastFile = r.json()[-1]['file']
-    r = requests.post(URLprefix + '/lsss/survey/config/unit/DataConf/files/selection', json={'firstIndex':0, 'lastIndex':lastIndex})
-    print("Selecting all files: " + str(r.status_code))
-    
+    r=get('/lsss/survey/config/unit/DataConf/files')
+    lastIndex = len(r) - 1
+#    lastFile = r[-1]['file']
+    post('/lsss/survey/config/unit/DataConf/files/selection', json={'firstIndex':0, 'lastIndex':lastIndex})
     	 
     
     
     #Merge all layers into one
-    r=requests.post(URLprefix + '/lsss/regions/selection',json={ "all" : True })
-    r=requests.post(URLprefix + '/lsss/regions/merge-layers')
+    post('/lsss/regions/selection',json={ "all" : True })
+    try: 
+        post('/lsss/regions/merge-layers')
+    except ValueError:
+        d=1
     
     
     #Remove all schools
@@ -290,22 +331,33 @@ def automaticInstrument(URLprefix,
         r=requests.delete(URLprefix+'/lsss/regions/region/'+str(dat['id']))
         
         
+    #set ping mapping to distance
+    post('/lsss/survey/config/unit/SurveyMiscConf/parameter/PingMapping',json={'value':'Distance'})
         
+    
+    
+    
     #Click to 5 nm resolution
     #This should be replaced with an api function
     click(80,50)
+    click(40,50)
+    click(80,50)
     
     
+    last_ping = -1
     
     
     #Loop through each 5 nm distance
     #This should be replaced so we recognise if we are at the end of the last file
-    for i in range(1000):
+    run = True
+    while(run == True):
                 
         
         #Grab all the frequencies
-        r=requests.get(URLprefix + '/lsss/data/frequencies')
-        frequencies = r.json()
+        frequencies = get('/lsss/data/frequencies')
+        
+        sounder_info = get('/lsss/data/config')['transducers']
+        
         
         #To be included in future, loop through each frequency
         for freq in frequencies: 
@@ -314,83 +366,96 @@ def automaticInstrument(URLprefix,
         
         #Sett frequency
         freq = 38000.0
-        r=requests.post(URLprefix + '/lsss/data/frequency',json={'value':freq})
+        post('/lsss/data/frequency',json={'value':freq})
         
         #Set to detailed window
-        r=requests.post(URLprefix + '/lsss/data/mode',json={'value':'DETAIL'})
+        post('/lsss/data/mode',json={'value':'DETAIL'})
         
         
         #Select all layers in window
-        r=requests.post(URLprefix + '/lsss/regions/selection',json= { "all" : True})
-        r.status_code
+        post('/lsss/regions/selection',json= { "all" : True})
         
         
         #Sett the lower threshold
-        requests.post(URLprefix + '/lsss/module/ColorBarModule/threshold/min',json={'value':TH_min})
+        post('/lsss/module/ColorBarModule/threshold/min',json={'value':TH_min})
         
         
         #Wait for all the data to be loaded
-        r = requests.get(URLprefix + '/lsss/data/wait')
+        get('/lsss/data/wait')
         
 
-        #Grab
-        r=requests.get(URLprefix+'/lsss/module/PelagicEchogramModule/overlay/AccumulatedSaOverlay/data')
-        t=json.loads(r.text)
+        #Grab data 
+        t=get('/lsss/module/PelagicEchogramModule/overlay/AccumulatedSaOverlay/data')
         
-        r=requests.get(URLprefix+'/lsss/module/PelagicEchogramModule/overlay/AccumulatedSaOverlay/data')
+        
+        #Set the species cathegory to be used
+        spec=[]
+        spec.append([i for i in t if i['id'] == acocat[0] ][0]['initials'])
+        spec.append([i for i in t if i['id'] == acocat[1] ][0]['initials'])
+    
+    
         
         #Need to check this        
-        log_distance = 5
+        log_distance = max(t['datasets'][0]['vesselDistance'])-min(t['datasets'][0]['vesselDistance'])
         sa = np.max(t['datasets'][0]['sa'])/log_distance
         
         
-        #Set back threshold to deafault
-        requests.post(URLprefix + '/lsss/module/ColorBarModule/threshold/min',json={'value':-82})
-        
-        
-        #THis function may in future replece the one below
-        #r = requests.get(URLprefix+'/lsss/module/InterpretationModule/database')
-        
-        
-#        http://localhost:8000/lsss/module/InterpretationModule/config/parameter
-        
-        
-        #Punching inn data
-        #This has to be more automated
-        click(1500,1000)
-        time.sleep(0.5)
-        click(1850,820)
-        time.sleep(1)
-        keyboard.write('\b')
-        keyboard.write('\b')
-        keyboard.write('\b')
-        keyboard.press('delete')   
-        keyboard.press('delete')   
-        keyboard.press('delete')   
-        
-        #Type sa values
-        if sa <400: 
+        #Trigger
+        if sa<sa_min: 
             sa = 0
-            keyboard.write('0') 
-        else:
-            keyboard.write(str(sa))      
-        keyboard.press('enter')  
+
+        
+        if not last_ping == max(t['datasets'][0]['vesselDistance']):
+            
+            #Check if we have a new file
+            last_ping = max(t['datasets'][0]['vesselDistance'])
+            
+            
+            #Set back threshold to deafault
+            post('/lsss/module/ColorBarModule/threshold/min',json={'value':-82})
+            t=get('/lsss/module/PelagicEchogramModule/overlay/AccumulatedSaOverlay/data')
+            sa_all = np.max(t['datasets'][0]['sa'])/log_distance
+            
+            
+            
+            #get the channel id
+            channel_id = [i for i in sounder_info if i['frequency']==freq][0]['id']
+            
+            
+            #Post to scruitiny
+            post('/lsss/module/InterpretationModule/scrutiny' ,
+                 json={'channels': [{'channelId': channel_id,
+                                     'categories': [{'id': acocat[1], 'initials': spec[1], 'assignment': (sa_all-sa)/sa_all},
+        {'id': acocat[0], 'initials': spec[0], 'assignment': sa/sa_all}]}]})
+        
+    
+            t = get('/lsss/survey/config/unit/AcousticCategoryConf/category')        
+            
+    
+            
+            #Set vertical resolution
+            post('/lsss/survey/config/unit/GridConf/parameter/VerticalGridSizePelagic', 
+                              json={'value':vertical_resolution})
+        
+        
+            #Load to database
+            post('/lsss/module/InterpretationModule/database', json={'resolution':horizontal_resolution,
+                                                                                              'quality':1,
+                                                                                              'frequencies':[round(freq/1000), round(freq/1000)]
+                                                                                              })
+        
             
         
-        
-        #Load to database
-        r = requests.post(URLprefix + '/lsss/module/InterpretationModule/database', json={'resolution':horizontal_resolution,
-                                                                                          'quality':1,
-                                                                                          'frequencies':[frequency, frequency]
-                                                                                          })
+#            post('/lsss/package/lsss/action/previousSegment/run',json={"name": True})
+            
     
-    
-        r=requests.get(URLprefix + '/lsss/module')
-        
-    
-        #Next 5 nmi
-        click(40,50)
-        
+#    CommetModule
+#    ConditionalMaskingExtractionModule
+#    TrackInfoModule
+            #Next 5 nmi
+            click(40,50)
+        else: 
+            break
 
 
 def runReportFromRaw(URLprefix,
@@ -472,6 +537,8 @@ def runReportFromRaw(URLprefix,
     r = requests.get(URLprefix + '/lsss/data/wait')
     print("Finish waiting: " + str(r.content))
     
+    
+    #This has to be cleened
     if type(reportType)==int: 
         print('Making luf:'+ str(reportType))
         r = requests.get(URLprefix + '/lsss/database/report/'+str(reportType))
@@ -502,7 +569,7 @@ def runReportFromRaw(URLprefix,
     r = requests.post(URLprefix + '/lsss/survey/close')
     print("Closed survey: " + str(r.status_code))
     
-    
+    r = requests.post(URLprefix +'/lsss/package/lsss/action/nextSegment/run')
     
     
 
@@ -652,8 +719,14 @@ filecmp.cmp('file1.txt', 'file2.txt')
 
 
 
+import sys
+
+if 'win' in sys.platform: 
+    main_dir = '//ces.imr.no/mea/2018_Redus/SurveyData'
+else: 
+    main_dir = '//data/mea/2018_Redus/SurveyData'
     
-main_dir = '//ces.imr.no/mea/2018_Redus/SurveyData'
+    
 timeSeries = 'Norwegian Sea NOR Norwegian spring-spawning herring spawning cruise in Feb_Mar'
 year = '2019'
 survey = 'S2019842_PVENDLA_3206'
@@ -667,6 +740,21 @@ path2LSSS = 'cmd.exe /c "C:/Program Files/Marec/lsss-2.8.0-alpha/lsss/LSSS.bat"&
 df = getNMDinfo()
 
 
+#Add saildrone
+import pandas as pd
+d = {'name':'Saildrone','cruiseid':list([2019204,2019207,2019847])}
+df = df.append(pd.DataFrame(d))
+
+
+
+cruise_id = df[df['name']=='Saildrone']['cruiseid']
+cruise_name = df[df['name']=='Saildrone']['name'][0]
+
+
+for cruise in cruise_id: 
+    print(cruise)
+    DownloadDataToScratch(cruise, cruise_name,main_dir)
+
 
 #Get the spawning survey
 cruise_id = df[df['name']==np.unique(df['name'])[17]]['cruiseid']
@@ -679,20 +767,24 @@ for cruise in cruise_id[12:len(cruise_id)]:
 
 cruise = cruise_id[len(cruise_id)-5]
 
+
+
 startLSSS(path2LSSS)
 
 
 
 
 automaticInstrument(URLprefix = 'http://localhost:8000',
-                     lsssFile='//ces.imr.no/mea/2018_Redus/SurveyData/Norwegian Sea NOR Norwegian spring-spawning herring spawning cruise in Feb_Mar/2019/S2019842_PVENDLA_3206/ACOUSTIC/LSSS/LSSS_FILES/S2019842_PVendla[3670].lsss',
-                     ek60File='//ces.imr.no/mea/2018_Redus/SurveyData/Norwegian Sea NOR Norwegian spring-spawning herring spawning cruise in Feb_Mar/2019/S2019842_PVENDLA_3206/ACOUSTIC/EK60/EK60_RAWDATA',
-                     workFile='//ces.imr.no/mea/2018_Redus/SurveyData/Norwegian Sea NOR Norwegian spring-spawning herring spawning cruise in Feb_Mar/2019/S2019842_PVENDLA_3206/ACOUSTIC/LSSS/WORK_automatic/',
-                     vertical_resolution=10,
+                     lsssFile='E:/Data/2019011_PSAILDRONE_1031/ACOUSTIC/LSSS/LSSS_FILES/S2019001_PSaildrone.lsss',
+                     ek60File='E:/Data/2019011_PSAILDRONE_1031/ACOUSTIC/EK80/EK80_RAWDATA',
+                     workFile='E:/Data/2019011_PSAILDRONE_1031/ACOUSTIC/LSSS/Work',
+                     vertical_resolution=1,
                      horizontal_resolution=0.1,
                      frequency=38,
                      reportType=25,
-                     TH_min = -55)
+                     TH_min = -55,
+                     sa_min = 200,
+                     acocat = [12,1])
 
 
 runLSSSReportMaker(main_dir,
