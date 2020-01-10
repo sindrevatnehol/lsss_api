@@ -22,7 +22,7 @@ def automaticInstrument(baseUrl,
                         acocat = [3,1]):
 
         
-    import requests, json
+    import requests, json, os, shutil
     import numpy as np
     
         
@@ -86,6 +86,16 @@ def automaticInstrument(baseUrl,
     print("Opening survey")
     post('/lsss/survey/open', json={'value':lsssFile})
     
+    
+    if not os.path.exists(os.path.dirname(workFile)+'/AutomaticInstrument'): 
+        os.mkdir(os.path.dirname(workFile)+'/AutomaticInstrument')
+    for file in os.listdir(workFile): 
+        if not os.path.isfile(os.path.join(os.path.dirname(workFile)+'/AutomaticInstrument',file)): 
+            shutil.copyfile(os.path.join(os.path.dirname(workFile),'WORK_V0',file), os.path.join(os.path.dirname(workFile)+'/AutomaticInstrument',file))
+    
+    
+    workFile = os.path.dirname(workFile)+'/AutomaticInstrument'
+    
     #Sett the location of the data
     print('Load interpretation data')
     post('/lsss/survey/config/unit/DataConf/parameter/WorkDir', json={'value':workFile})
@@ -112,6 +122,7 @@ def automaticInstrument(baseUrl,
     r=requests.get(baseUrl + '/lsss/regions/region')
     data = json.loads(r.text)
     for dat in data: 
+        print('removing school: ' + str(dat['id']))
         r=requests.delete(baseUrl+'/lsss/regions/region/'+str(dat['id']))
         
         
@@ -123,9 +134,9 @@ def automaticInstrument(baseUrl,
     
     #Click to 5 nm resolution
     #This should be replaced with an api function
-    click(80,50)
-    click(40,50)
-    click(80,50)
+    click(80,58)
+#    click(40,58)
+#    click(80,58)
 #    post('/lsss/package/lsss/action/nextegment/run',json={"name": True})
     
     
@@ -173,7 +184,7 @@ def automaticInstrument(baseUrl,
         
 
         #Grab data 
-        t=get('/lsss/module/PelagicEchogramModule/overlay/AccumulatedSaOverlay/data')
+        t=get('/lsss/survey/config/unit/AcousticCategoryConf/category')
         
         
         #Set the species cathegory to be used
@@ -183,7 +194,7 @@ def automaticInstrument(baseUrl,
     
     
         
-        #Need to check this        
+        t=get('/lsss/module/PelagicEchogramModule/overlay/AccumulatedSaOverlay/data')
         log_distance = max(t['datasets'][0]['vesselDistance'])-min(t['datasets'][0]['vesselDistance'])
         sa = np.max(t['datasets'][0]['sa'])/log_distance
         
@@ -209,12 +220,12 @@ def automaticInstrument(baseUrl,
             #get the channel id
             channel_id = [i for i in sounder_info if i['frequency']==freq][0]['id']
             
-            
-            #Post to scruitiny
-            post('/lsss/module/InterpretationModule/scrutiny' ,
-                 json={'channels': [{'channelId': channel_id,
-                                     'categories': [{'id': acocat[1], 'initials': spec[1], 'assignment': (sa_all-sa)/sa_all},
-        {'id': acocat[0], 'initials': spec[0], 'assignment': sa/sa_all}]}]})
+            if sa_all>0:
+                #Post to scruitiny
+                post('/lsss/module/InterpretationModule/scrutiny' ,
+                     json={'channels': [{'channelId': channel_id,
+                                         'categories': [{'id': acocat[1], 'initials': spec[1], 'assignment': (sa_all-sa)/sa_all},
+            {'id': acocat[0], 'initials': spec[0], 'assignment': sa/sa_all}]}]})
         
     
             t = get('/lsss/survey/config/unit/AcousticCategoryConf/category')        
@@ -233,15 +244,9 @@ def automaticInstrument(baseUrl,
                                                                                               })
         
             
-        
-#            post('/lsss/package/lsss/action/previousSegment/run',json={"name": True})
-            
-    
-#    CommetModule
-#    ConditionalMaskingExtractionModule
-#    TrackInfoModule
-            #Next 5 nmi
-            click(40,50)
+            post('/lsss/package/lsss/action/nextSegment/run')
+            if sa_all==0: 
+                click(80,58)
         else: 
             break
 

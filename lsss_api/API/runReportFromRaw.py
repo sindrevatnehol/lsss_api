@@ -135,7 +135,7 @@ def runReportFromRaw(baseUrl,
                 print('Write report')
                 with open(luf25file+'L_'+str(luftype)+'_LSSSV_'+lsss_version+'.xml', 'w+') as f:
                     f.write(r.text)
-
+    print('Finnished writing report')
 
     get('/lsss/data/wait')
     

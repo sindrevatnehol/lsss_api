@@ -1,2 +1,4 @@
 from .getNMDinfo import getNMDinfo
 from .DownloadDataToScratch import DownloadDataToScratch
+from .DownloadWORKToScratchFromCES import DownloadWORKToScratchFromCES
+from .DownloadInterpretation import DownloadInterpretation

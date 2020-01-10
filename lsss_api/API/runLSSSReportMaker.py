@@ -35,18 +35,18 @@ def runLSSSReportMaker(main_dir = '//ces.imr.no/mea/2018_Redus/SurveyData',
     
     
     #Get all version of the lsss file
-    LSSS_versions = [x for x in os.listdir(cruise_dir+'ACOUSTIC/LSSS/LSSS_FILES') if '.lsss' in x]
+    LSSS_versions = [x for x in os.listdir(cruise_dir+'INTERPRETATION/LSSS') if '.lsss' in x]
     if(len(LSSS_versions)>1): 
         print('Error: multiple raw files is avaliable. THis is not allowed at this current version')
     LSSS_versions = LSSS_versions[0]
     
     
     #Get all versions of interpretations
-    WORK_versions = [x for x in os.listdir(cruise_dir+'ACOUSTIC/LSSS') if ('WORK'  in x or 'SNAP' in x) and not 'REPORT' in x]
+    WORK_versions = [x for x in os.listdir(cruise_dir+'INTERPRETATION/LSSS') if ('WORK'  in x or 'SNAP' in x) and not 'REPORT' in x]
     
     
     #Get all versios of echosounder data
-    EKdatas = [x for x in os.listdir(cruise_dir+'ACOUSTIC/') if 'EK' in x]
+    EKdatas = [x for x in os.listdir(cruise_dir+'DATA/') if not 'KORONA' in x and not '.txt' in x]
 #    KoronaDatas = [x for x in os.listdir(cruise_dir+'ACOUSTIC/LSSS') if 'KORONA' in x]
     
         
@@ -56,32 +56,32 @@ def runLSSSReportMaker(main_dir = '//ces.imr.no/mea/2018_Redus/SurveyData',
         for WORK_version in WORK_versions: 
             
             #Get path of the interpretation
-            workFile = cruise_dir+'ACOUSTIC/LSSS/'+WORK_version
+            workFile = cruise_dir+'INTERPRETATION/LSSS/'+WORK_version
             
-            if 'WORK' in WORK_version:
-                print('Deleting snap from work')
-                for snap_files_delete in os.listdir(workFile):
-                    if '.snap' in snap_files_delete: 
-                        print('    Deleting: ' + snap_files_delete)
-                        os.remove(workFile+'/'+snap_files_delete)
-
-            if 'SNAP' in WORK_version:
-                print('Deleting work from snap')
-                for snap_files_delete in os.listdir(workFile):
-                    if '.work' in snap_files_delete: 
-                        print('    Deleting: ' + snap_files_delete)
-                        os.remove(workFile+'/'+snap_files_delete)
+#            if 'WORK' in WORK_version:
+#                print('Deleting snap from work')
+#                for snap_files_delete in os.listdir(workFile):
+#                    if '.snap' in snap_files_delete: 
+#                        print('    Deleting: ' + snap_files_delete)
+#                        os.remove(workFile+'/'+snap_files_delete)
+#
+#            if 'SNAP' in WORK_version:
+#                print('Deleting work from snap')
+#                for snap_files_delete in os.listdir(workFile):
+#                    if '.work' in snap_files_delete: 
+#                        print('    Deleting: ' + snap_files_delete)
+#                        os.remove(workFile+'/'+snap_files_delete)
 
 
             #Add report folder if this do not exist
-            if not os.path.exists(cruise_dir+'ACOUSTIC/LSSS/'+'REPORTS'):
-                os.makedirs(cruise_dir+'ACOUSTIC/LSSS/'+'REPORTS')
+            if not os.path.exists(cruise_dir+'INTERPRETATION/LSSS/'+'REPORTS'):
+                os.makedirs(cruise_dir+'INTERPRETATION/LSSS/'+'REPORTS')
             
             
             
             #Get path and make the folder for the reports
             print('Do version: ' + EKdata+'_'+WORK_version)
-            reportFileRaw = cruise_dir+'ACOUSTIC/LSSS/REPORTS/'+'REPORTS_'+EKdata+'_'+WORK_version+'/'
+            reportFileRaw = cruise_dir+'INTERPRETATION/LSSS/REPORTS/'+'REPORTS_'+EKdata+'_'+WORK_version+'/'
             if not os.path.exists(reportFileRaw):
                 os.makedirs(reportFileRaw)
 
@@ -91,8 +91,8 @@ def runLSSSReportMaker(main_dir = '//ces.imr.no/mea/2018_Redus/SurveyData',
         
             
             #Grab location of the data
-            lsssFile = cruise_dir+'ACOUSTIC/LSSS/LSSS_FILES/'+LSSS_versions
-            ek60File= cruise_dir+'ACOUSTIC/'+EKdata+'/'+EKdata+'_RAWDATA'
+            lsssFile = cruise_dir+'INTERPRETATION/LSSS/'+LSSS_versions
+            ek60File= cruise_dir+'DATA/'+EKdata
             
             
             
