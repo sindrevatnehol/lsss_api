@@ -66,6 +66,14 @@ for cruise in cruise_id[12:len(cruise_id)]:
     NMDdata.DownloadDataToScratch(cruise, cruise_name,main_dir)
     
     
+import os
+raw = '//ces.imr.no/mea/2018_Redus/SurveyData/Norwegian Sea NOR Norwegian spring-spawning herring spawning cruise in Feb_Mar/2015/S2015833_PNYBO_4135/DATA/RAWDATA_V0/2015833-D20150202-T213406.raw'
+raw_s = (os.path.getsize(raw))
+
+raw1 = '//ces.imr.no/cruise_data/2015/S2015833_PNYBO_4135/ACOUSTIC_DATA/EK60/EK60_RAWDATA/2015833-D20150202-T213406.raw'
+raw1_s = (os.path.getsize(raw1))
+
+
     
 NMDdata.DownloadInterpretation(main_dir,work_dir,cruise_name)
     

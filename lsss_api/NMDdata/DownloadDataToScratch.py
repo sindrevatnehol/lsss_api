@@ -103,6 +103,11 @@ def DownloadDataToScratch(cruise, cruise_name,main_dir):
                 if not os.path.isfile(os.path.join(raw_dir,os.path.basename(raw))): 
                     print('copying: '+ os.path.basename(raw))
                     shutil.copyfile(raw, os.path.join(raw_dir,os.path.basename(raw)))
+                else: 
+                    if os.path.getsize(raw)!=os.path.getsize(os.path.join(raw_dir,os.path.basename(raw))): 
+                        print('copying: '+ os.path.basename(raw))
+                        shutil.copyfile(raw, os.path.join(raw_dir,os.path.basename(raw)))
+                        
         
        
     
